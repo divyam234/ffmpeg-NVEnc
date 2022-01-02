@@ -1,0 +1,31 @@
+version: 2.1
+
+executors:
+  default:
+    machine:
+      image: ubuntu-2004:202010-01
+jobs:
+  build:
+    executor: 'default'
+    steps:
+      - run:
+          name: 'pull base image'
+          command: |
+            docker pull nvidia/cuda:11.4.2-devel-ubuntu20.04
+      - checkout
+      - run:
+          name: 'build ffmpeg'
+          command: |
+            docker build -t ffmpeg:cuda-ubuntu -f cuda-ubuntu.dockerfile .
+      - run:
+          name: 'copy build'
+          command: |
+            docker run -it --rm  -v $CIRCLE_WORKING_DIRECTOR/artifacts:/app/workspace ffmpeg:cuda-ubuntu bash copy.sh
+      
+      - run:
+          name: Zipping FFmpeg Build
+          command: |
+            zip -r $CIRCLE_WORKING_DIRECTOR/ffmpeg-dynamic-build.zip $CIRCLE_WORKING_DIRECTOR/artifacts
+ 
+      - store_artifacts:
+          path: $CIRCLE_WORKING_DIRECTOR/ffmpeg-dynamic-build.zip
