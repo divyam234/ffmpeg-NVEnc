@@ -1,85 +1,9 @@
 name: build test
 
 on:
-  push:
-    paths-ignore:
-      - '*.md'
-  pull_request:
-    branches: [ master ]
-    
   workflow_dispatch:
 
 jobs:
-  build-linux:
-    name: build in native linux
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: install libva-dev
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libva-dev
-
-      - name: build ffmpeg
-        run: |
-          while sleep 300; do echo "=====[ $SECONDS seconds still running ]====="; done &
-          SKIPINSTALL=yes VERBOSE=yes ./build-ffmpeg --build --enable-gpl-and-non-free
-          kill %1
-      - name: check shared library
-        run: |
-          ldd ./workspace/bin/ffmpeg
-      - name: test run ffmepg
-        run: |
-          ./workspace/bin/ffmpeg -buildconf
-      - name: clean up
-        run: |
-          ./build-ffmpeg --cleanup
-
-  build-macos:
-    name: build in native macOS
-    runs-on: macos-10.15
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: build ffmpeg
-        run: |
-          while sleep 300; do echo "=====[ $SECONDS seconds still running ]====="; done &
-          SKIPINSTALL=yes VERBOSE=yes ./build-ffmpeg --build --enable-gpl-and-non-free
-          kill %1
-      - name: check shared library
-        run: |
-          otool -L ./workspace/bin/ffmpeg
-      - name: test run ffmepg
-        run: |
-          ./workspace/bin/ffmpeg -buildconf
-      - name: clean up
-        run: |
-          ./build-ffmpeg --cleanup
-
-  build-docker:
-    name: build in docker
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: pull base image
-        id: ubuntu_pull
-        run: |
-          docker pull ubuntu:20.04
-      - name: run if ubuntu_pull failed
-        if: failure() && steps.ubuntu_pull.outcome == 'failure'
-        run: |
-          docker pull ubuntu:20.04
-      - name: build ffmpeg
-        run: |
-          docker build -t ffmpeg:ubuntu -f Dockerfile .
-      - name: test run ffmepg
-        run: |
-          docker run --rm ffmpeg:ubuntu -buildconf
 
   build-cuda-ubuntu-docker:
     name: build in ubuntu docker with cuda
@@ -92,44 +16,28 @@ jobs:
         id: cuda_ubuntu_pull
         run: |
           docker pull nvidia/cuda:11.4.2-devel-ubuntu20.04
-          docker pull ubuntu:20.04
+
       - name: run if cuda_ubuntu_pull failed
         if: failure() && steps.cuda_ubuntu_pull.outcome == 'failure'
         run: |
           docker pull nvidia/cuda:11.4.2-devel-ubuntu20.04
-          docker pull ubuntu:20.04
+
       - name: build ffmpeg
         run: |
           docker build -t ffmpeg:cuda-ubuntu -f cuda-ubuntu.dockerfile .
-      - name: test run ffmepg
-        run: |
-          docker run --rm ffmpeg:cuda-ubuntu -buildconf
 
-  build-cuda-centos-docker:
-    name: build in centos docker with cuda
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: copy build
+        run: |
+          docker run -it --rm  -v ${{ github.workspace }}/artifact:/app/workspace ffmpeg:cuda-ubuntu bash copy.sh
 
-      - name: pull base image
-        id: cuda_centos_pull
-        run: |
-          docker pull nvidia/cuda:11.4.2-devel-centos8
-          docker pull centos:8
-      - name: run if cuda_centos_pull failed
-        if: failure() && steps.cuda_centos_pull.outcome == 'failure'
-        run: |
-          docker pull nvidia/cuda:11.4.2-devel-centos8
-          docker pull centos:8
-      - name: build ffmpeg
-        run: |
-          docker build -t ffmpeg:cuda-centos -f cuda-centos.dockerfile .
-      - name: test run ffmepg
-        run: |
-          docker run --rm ffmpeg:cuda-centos -buildconf
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ffmpeg-dynamic-build
+          path: ${{ github.workspace }}/artifact/**/*
+
 
   build-full-static:
+    if: ${{ false }}
     name: full static build in docker
     runs-on: ubuntu-20.04
     steps:
